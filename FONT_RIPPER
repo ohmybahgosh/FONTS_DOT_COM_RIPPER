@@ -1,0 +1,157 @@
+#!/bin/bash
+#######################################################################################################################
+#######################################################################################################################
+#######################################################################################################################
+########################                                                                      #########################
+########################         _____ _   _____     _____     _   _____         _            #########################
+########################        |     | |_|     |_ _| __  |___| |_|   __|___ ___| |_          #########################
+########################        |  |  |   | | | | | | __ -| .'|   |  |  | . |_ -|   |         #########################
+########################        |_____|_|_|_|_|_|_  |_____|__,|_|_|_____|___|___|_|_|         #########################
+########################                        |___|                                         #########################
+########################                                                                      #########################
+#######################################################################################################################
+########################                            REQUIRED TOOLS:                           #########################
+########################        SED: https://www.gnu.org/software/sed/manual/sed.html         #########################
+########################               XIDEL: https://github.com/benibela/xidel               #########################
+########################                   CURL: https://github.com/curl/curl                 #########################
+########################                  WOFF2 https://github.com/google/woff2               #########################
+#######################################################################################################################
+#######################################################################################################################
+########################                        ==What This Script Does:==                    #########################
+#######################################################################################################################
+########################                       RIPZ ANY FONT FROM FONTS.COM..                 #########################
+#######################################################################################################################
+#######################################################################################################################
+#######################################################################################################################
+###              /$$$$$$$  /$$$$$$$$  /$$$$$$  /$$$$$$$        /$$$$$$$$ /$$   /$$ /$$$$$$  /$$$$$$                 ###
+###  ;;;;;      | $$__  $$| $$_____/ /$$__  $$| $$__  $$      |__  $$__/| $$  | $$|_  $$_/ /$$__  $$         ;;;;;  ###
+###  ;;;;;      | $$  \ $$| $$      | $$  \ $$| $$  \ $$         | $$   | $$  | $$  | $$  | $$  \__/         ;;;;;  ###
+###  ;;;;;      | $$$$$$$/| $$$$$   | $$$$$$$$| $$  | $$         | $$   | $$$$$$$$  | $$  |  $$$$$$          ;;;;;  ###
+###  ;;;;;      | $$$$$$$/| $$$$$   | $$$$$$$$| $$  | $$         | $$   | $$$$$$$$  | $$  |  $$$$$$          ;;;;;  ###
+###  ;;;;;      | $$__  $$| $$__/   | $$__  $$| $$  | $$         | $$   | $$__  $$  | $$   \____  $$         ;;;;;  ###
+###..;;;;;..    | $$  \ $$| $$      | $$  | $$| $$  | $$         | $$   | $$  | $$  | $$   /$$  \ $$       ..;;;;;..###
+### ':::::'     | $$  | $$| $$$$$$$$| $$  | $$| $$$$$$$/         | $$   | $$  | $$ /$$$$$$|  $$$$$$/        ':::::' ###
+###   ':`       |__/  |__/|________/|__/  |__/|_______/          |__/   |__/  |__/|______/ \______/           ':`   ###
+#######################################################################################################################
+#######################################################################################################################
+#######################################################################################################################
+#######################################################################################################################
+#######################################################################################################################
+#######################################################################################################################
+##         **YOU MUST PROVIDE A FONT FAMILY URL FROM FONTS.COM, NOT A PACKAGE URL..IT'll LOOK LIKE THIS:**           ##
+##                             https://www.fonts.com/font/melvastype/kuunari-rounded                                 ##
+##                               https://www.fonts.com/font/linotype/neue-helvetica                                  ##
+##                                 https://www.fonts.com/font/fontfabric/nexa-rust                                   ##
+################################                  ...ETC ETC ETC                    ...################################
+#######################################################################################################################
+#######################################################################################################################
+## SETUP TERM TO OUTPUT IN COLOR
+export TERM=xterm-256color
+
+## GRAB MAIN FAMILY FONT PAGE URL VIA CLI INPUT
+clear
+read -e -r -p "$(clear) $(printf "\e[29m\e[1m\nProvide The Fonts.com Font Family URL:\e[0m") $(printf "\e\033[0;91m\nExample: https://www.fonts.com/font/melvastype/kuunari-rounded\e[0m") $(printf "\e[29m\e[1m\n\nENTER THE URL:\e[0m\n\e\033[1;32m> \e[0m")" FAMILY_FONT_URL
+clear
+
+## DUMP SOURCECODE FROM FAMILY FONT URL VIA CURL..STORING IT AS A VARIABLE
+FAMILY_SOURCECODE=$(curl --silent -L "${FAMILY_FONT_URL}")
+
+## GRAB FONT FAMILY NAME & AUTHOR
+FONT_FAMILY_INFO=$(echo "${FAMILY_SOURCECODE}" | xidel -s --output-separator=" By " --xpath "//div[@class='content']//h1" --xpath "/html/body/div/div/div[3]/div[1]/div/div[1]/p/a/text()" -)
+
+## CREATE EXTRA VAIRABLES FROM INPUT FONT FAMILY URL
+FAMILY_NAME_DASHES=$(echo $FONT_FAMILY_INFO | sed -e 's# By.*$##g' -e 's#$#-Font-Family#g' -e 's# #-#g')
+FONT_FAMILY_PREFIX=$(echo $FONT_FAMILY_INFO | sed -e 's# By.*$##g' -e 's# #-#g')
+
+## MAKE PARENT FONT FAMILY FOLDER
+mkdir "${FAMILY_NAME_DASHES}"
+
+## DISPLAY PARSED FONT FAMILY INFO FROM PROVIDED URL
+printf "\n\e\033[0;92mFont Family Extracted From URL:\e[0m"
+printf "\n\e[29m\e[1m\"${FONT_FAMILY_INFO}\"\e[0m\n\n\n"
+sleep 5
+clear
+printf "\n\e\033[0;96mOkie Dokey, let's run this script...\e[0m"
+sleep 3
+clear
+
+## GRAB ALL URLS FROM FONT FAMILY INDEX PAGE
+printf "\n\e\033[0;92mEXTRACTING EACH FAMILY MEMBER'S URL..\e[0m"
+printf "\n\e[29m\e[1mSAVING URLs TO TMP URL LIST FILE..\e[0m"
+sleep 4
+echo "${FAMILY_SOURCECODE}" | xidel -s --xpath "//li/h2/a/@href" - | sed 's#^#https://www.fonts.com#g' >>"${FAMILY_NAME_DASHES}__URLS.tmp"
+clear
+
+## LOOP URL LIST TO GENERATE FORMATTED ARIA2C INPUT FILE
+printf "\n\e\033[0;92mLOOP PARSING EACH FAMILY MEMBER'S SOURCECODE..\e[0m"
+printf "\n\e[29m\e[1mBUILDING THE ARIA2C FORMATTED INPUT FILE..\e[0m"
+sleep 4
+while read -r CURRENT_LOOP_URL; do
+	## GRAB THE WOFF2 URL FROM EACH FONT FAMILY MEMBER'S SUB-PAGE
+	FAMILY_MEMBER_WOFF2_URL=$(xidel "${CURRENT_LOOP_URL}" -s --xpath "(//div[@data-view='webfont']/div[1])[1]" - | grep --color -i -E -o "(fast.fonts.net.*?\.woff2)" | sed 's#^#https://#g')
+
+	## BUILD THE FORMATTED ARIA2C INPUT FILE...LINE BY LINE
+	echo "$CURRENT_LOOP_URL" | sed -e "s#\(.*/\)\(.*\)#${FAMILY_MEMBER_WOFF2_URL}\n\tdir=\./${FAMILY_NAME_DASHES}\n\tout=${FONT_FAMILY_PREFIX}-\2.woff2#g" >>ARIA2C_INPUT_FILE.txt
+done <"./${FAMILY_NAME_DASHES}__URLS.tmp"
+clear
+
+## MULTITHREAD DOWNLOAD FONTS VIA ARIA2C
+printf "\n\e\033[0;92mBEGIN DOWNLOADING FONTS VIA ARIA2C..\e[0m"
+printf "\n\e[29m\e[1mHOW LONG THIS TAKES WILL DEPEND ON HOW MANY FONTS ARE IN THE FAMILY..\e[0m"
+sleep 4
+aria2c -x12 -s12 -j12 -i ./ARIA2C_INPUT_FILE.txt
+clear
+printf "\n\e\033[0;92mARIA2C HAS DOWNLOADED ALL OF THE FONTS IN THE FAMILY..\e[0m"
+printf "\n\e[29m\e[1mMOVING ON..\e[0m"
+sleep 4
+clear
+
+## REMOVE TMP FAMILY FONT URL LIST & ARIA2C INPUT FILE
+printf "\n\e\033[0;96mLET'S CLEANUP THESE TMP FILES...\e[0m"
+sleep 2
+rm "./${FAMILY_NAME_DASHES}__URLS.tmp"
+rm "./ARIA2C_INPUT_FILE.txt"
+
+## MAKE WOFF2 & TTF OUTPUT FOLDERS
+printf "\n\e[29m\e[1mMaking TTF & WOFF2 FOLDERS..\e[0m\n"
+sleep 2
+mkdir "${FAMILY_NAME_DASHES}/${FAMILY_NAME_DASHES}-TTF"
+mkdir "${FAMILY_NAME_DASHES}/${FAMILY_NAME_DASHES}-WOFF2"
+
+## DECOMPRESS WOFF2 FONTS IN TO TTF
+printf "\n\e[29m\e[1mDECOMPRESS WOFF2 FILES, CREATING TTF FILES...\e[0m\n"
+sleep 2
+for file in ${FAMILY_NAME_DASHES}/*.woff2; do woff2_decompress $file; done
+
+##MOVE WOFF2 TO "${FAMILY_NAME_DASHES}-WOFF2"
+printf "\n\e[29m\e[1mMOVING WOFF2 FILES TO THEIR OWN FOLDER...\e[0m\n"
+sleep 2
+mv ${FAMILY_NAME_DASHES}/*.woff2 "${FAMILY_NAME_DASHES}/${FAMILY_NAME_DASHES}-WOFF2"
+
+##MOVE TTF TO "${FAMILY_NAME_DASHES}-TTF"
+printf "\n\e[29m\e[1mMOVING TTF FILES TO THEIR OWN FOLDER...\e[0m\n"
+sleep 2
+mv ${FAMILY_NAME_DASHES}/*.ttf "${FAMILY_NAME_DASHES}/${FAMILY_NAME_DASHES}-TTF"
+
+## COMPRESS WOFF2 FONT FAMILY FOLDER
+printf "\n\n\u001b[1m\u001b[31mCOMPRESSING THE WOFF2 FONT FOLDER...\e[0m\n"
+sleep 2
+zip -rmq "${FAMILY_NAME_DASHES}/${FAMILY_NAME_DASHES}-WOFF2.zip" "${FAMILY_NAME_DASHES}/${FAMILY_NAME_DASHES}-WOFF2"
+
+## COMPRESS TFF FONT FAMILY FOLDER
+printf "\n\n\u001b[1m\u001b[31mCOMPRESSING THE TTF FONT FOLDER...\e[0m\n"
+sleep 2
+zip -rmq "${FAMILY_NAME_DASHES}/${FAMILY_NAME_DASHES}-TTF.zip" "${FAMILY_NAME_DASHES}/${FAMILY_NAME_DASHES}-TTF"
+
+## COMPRESSING THE FONT FAMILY FOLDER CONTAINING BOTH TTF & WOFF2 ZIP FILES
+printf "\n\u001b[1m\u001b[31mCOMPRESSING FONT FAMILY FOLDER CONTAINING BOTH TTF & WOFF2 ZIP FILES...\e[0m\n"
+sleep 2
+zip -rmq "${FAMILY_NAME_DASHES}.zip" "${FAMILY_NAME_DASHES}"
+
+## THAT'S ALL, FOLKS
+clear
+printf "\n\e[29m\e[1mALL DONE\e[0m\n"
+printf "\n\e[29m\e[1mFor More Scripts\nVisit...\e[0m\n"
+printf "\n\u001b[1m\u001b[31m\ngithub.com/OhMyBahGosh\u001b[0m\n\n"
+sleep 5
+exit 0
